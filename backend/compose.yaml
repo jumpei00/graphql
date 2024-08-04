@@ -1,0 +1,36 @@
+services:
+    backend:
+        container_name: backend
+        build:
+            context: .
+            dockerfile: ./Docker/server/Dockerfile
+        ports:
+            - "8080:8080"
+        volumes:
+          - type: bind
+            source: ./
+            target: /backend
+        environment:
+            - DB_HOST=postgres
+            - DB_USER=developer
+            - DB_PASSWORD=password
+            - DB_NAME=sns
+            - DB_PORT=5432
+        depends_on:
+            - postgres
+    postgres:
+        container_name: postgres
+        image: postgres:16.3
+        ports:
+            - "5432:5432"
+        volumes:
+            - type: volume
+              source: postgres-volume
+              target: /var/lib/postgresql/data
+        environment:
+            POSTGRES_USER: developer
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: sns
+
+volumes:
+    postgres-volume:
