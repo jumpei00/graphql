@@ -14,4 +14,6 @@ type Comment struct {
 	content       string    `bun:"content,notnull"`
 	CreatedAt     time.Time `bun:"created_at,default:current_timestamp"`
 	UpdatedAt     time.Time `bun:"updated_at,default:current_timestamp"`
+	User          *User     `bun:"rel:belongs-to,join:user_id=id"`
+	Post          *Post     `bun:"rel:belongs-to,join:post_id=id"`
 }
