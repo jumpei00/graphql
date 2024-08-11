@@ -1,0 +1,70 @@
+directive @isAuthenticated on FIELD_DEFINITION
+
+scalar DateTime
+
+type User {
+    id: ID!
+    username: String!
+    mailaddress: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    posts: [Post!]!
+    comments: [Comment!]!
+    likes: [Like!]!
+}
+
+type Post {
+    id: ID!
+    content: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    user: User!
+    comments: [Comment!]!
+    likes: [Like!]!
+}
+
+type Comment {
+    id: ID!
+    content: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    user: User!
+    post: Post!
+}
+
+type Like {
+    id: ID!
+    createdAt: DateTime!
+    user: User!
+    post: Post!
+}
+
+type Query {
+    user(id: ID!): User @isAuthenticated
+    posts: [Post!]!
+    post(id: ID!): Post
+}
+
+type Mutation {
+    createUser(
+        username: String!
+        mailaddress: String!
+        password: String!
+    ): User!
+    updateUser(
+        id: ID!
+        username: String!
+        mailaddress: String!
+        password: String!
+    ): User! @isAuthenticated
+    deleteUser(id: ID!): Boolean! @isAuthenticated
+
+    createPost(content: String!): Post! @isAuthenticated
+    updatePost(id: ID!, content: String!): Post! @isAuthenticated
+    deletePost(id: ID!): Boolean! @isAuthenticated
+
+    createComment(postID: ID!, content: String!): Comment! @isAuthenticated
+
+    createLike(postID: ID!): Like! @isAuthenticated
+    deleteLike(postID: ID!): Boolean! @isAuthenticated
+}
