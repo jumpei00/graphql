@@ -2,25 +2,49 @@
 
 package schema
 
+import (
+	"time"
+)
+
+type Comment struct {
+	ID        int       `json:"id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	User      *User     `json:"user"`
+	Post      *Post     `json:"post"`
+}
+
+type Like struct {
+	ID        int       `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	User      *User     `json:"user"`
+	Post      *Post     `json:"post"`
+}
+
 type Mutation struct {
 }
 
-type NewTodo struct {
-	Text   string `json:"text"`
-	UserID string `json:"userId"`
+type Post struct {
+	ID        int        `json:"id"`
+	Content   string     `json:"content"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+	User      *User      `json:"user"`
+	Comments  []*Comment `json:"comments"`
+	Likes     []*Like    `json:"likes"`
 }
 
 type Query struct {
 }
 
-type Todo struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-	Done bool   `json:"done"`
-	User *User  `json:"user"`
-}
-
 type User struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID          int        `json:"id"`
+	Username    string     `json:"username"`
+	Mailaddress string     `json:"mailaddress"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+	Posts       []*Post    `json:"posts"`
+	Comments    []*Comment `json:"comments"`
+	Likes       []*Like    `json:"likes"`
 }
