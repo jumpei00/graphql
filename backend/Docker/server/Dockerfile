@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Base image
-FROM golang:1.22.4 AS base
+FROM golang:1.23.0 AS base
 
 WORKDIR /backend
 
