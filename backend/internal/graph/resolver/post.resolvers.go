@@ -9,16 +9,37 @@ import (
 	"fmt"
 
 	"github.com/jumpei00/graphql/backend/internal/graph"
+	"github.com/jumpei00/graphql/backend/internal/graph/model"
 	"github.com/jumpei00/graphql/backend/internal/graph/schema"
 )
 
+// User is the resolver for the user field.
+func (r *commentResolver) User(ctx context.Context, obj *model.Comment) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: User - user"))
+}
+
+// Post is the resolver for the post field.
+func (r *commentResolver) Post(ctx context.Context, obj *model.Comment) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Post - post"))
+}
+
+// User is the resolver for the user field.
+func (r *likeResolver) User(ctx context.Context, obj *model.Like) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: User - user"))
+}
+
+// Post is the resolver for the post field.
+func (r *likeResolver) Post(ctx context.Context, obj *model.Like) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Post - post"))
+}
+
 // CreateUser is the resolver for the createUser field.
-func (r *mutationResolver) CreateUser(ctx context.Context, username string, mailaddress string, password string) (*schema.User, error) {
+func (r *mutationResolver) CreateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error) {
 	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
 }
 
 // UpdateUser is the resolver for the updateUser field.
-func (r *mutationResolver) UpdateUser(ctx context.Context, id int, username string, mailaddress string, password string) (*schema.User, error) {
+func (r *mutationResolver) UpdateUser(ctx context.Context, id int, userInput schema.UserInput) (*model.User, error) {
 	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
 }
 
@@ -28,12 +49,12 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id int) (bool, error)
 }
 
 // CreatePost is the resolver for the createPost field.
-func (r *mutationResolver) CreatePost(ctx context.Context, content string) (*schema.Post, error) {
+func (r *mutationResolver) CreatePost(ctx context.Context, content string) (*model.Post, error) {
 	panic(fmt.Errorf("not implemented: CreatePost - createPost"))
 }
 
 // UpdatePost is the resolver for the updatePost field.
-func (r *mutationResolver) UpdatePost(ctx context.Context, id int, content string) (*schema.Post, error) {
+func (r *mutationResolver) UpdatePost(ctx context.Context, id int, content string) (*model.Post, error) {
 	panic(fmt.Errorf("not implemented: UpdatePost - updatePost"))
 }
 
@@ -43,12 +64,12 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id int) (bool, error)
 }
 
 // CreateComment is the resolver for the createComment field.
-func (r *mutationResolver) CreateComment(ctx context.Context, postID int, content string) (*schema.Comment, error) {
+func (r *mutationResolver) CreateComment(ctx context.Context, postID int, content string) (*model.Comment, error) {
 	panic(fmt.Errorf("not implemented: CreateComment - createComment"))
 }
 
 // CreateLike is the resolver for the createLike field.
-func (r *mutationResolver) CreateLike(ctx context.Context, postID int) (*schema.Like, error) {
+func (r *mutationResolver) CreateLike(ctx context.Context, postID int) (*model.Like, error) {
 	panic(fmt.Errorf("not implemented: CreateLike - createLike"))
 }
 
@@ -58,25 +79,71 @@ func (r *mutationResolver) DeleteLike(ctx context.Context, postID int) (bool, er
 }
 
 // User is the resolver for the user field.
-func (r *queryResolver) User(ctx context.Context, id int) (*schema.User, error) {
+func (r *postResolver) User(ctx context.Context, obj *model.Post) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: User - user"))
+}
+
+// Comments is the resolver for the comments field.
+func (r *postResolver) Comments(ctx context.Context, obj *model.Post) ([]*model.Comment, error) {
+	panic(fmt.Errorf("not implemented: Comments - comments"))
+}
+
+// Likes is the resolver for the likes field.
+func (r *postResolver) Likes(ctx context.Context, obj *model.Post) ([]*model.Like, error) {
+	panic(fmt.Errorf("not implemented: Likes - likes"))
+}
+
+// User is the resolver for the user field.
+func (r *queryResolver) User(ctx context.Context, id int) (*model.User, error) {
 	panic(fmt.Errorf("not implemented: User - user"))
 }
 
 // Posts is the resolver for the posts field.
-func (r *queryResolver) Posts(ctx context.Context) ([]*schema.Post, error) {
+func (r *queryResolver) Posts(ctx context.Context) ([]*model.Post, error) {
 	panic(fmt.Errorf("not implemented: Posts - posts"))
 }
 
 // Post is the resolver for the post field.
-func (r *queryResolver) Post(ctx context.Context, id int) (*schema.Post, error) {
+func (r *queryResolver) Post(ctx context.Context, id int) (*model.Post, error) {
 	panic(fmt.Errorf("not implemented: Post - post"))
 }
+
+// Posts is the resolver for the posts field.
+func (r *userResolver) Posts(ctx context.Context, obj *model.User) ([]*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Posts - posts"))
+}
+
+// Comments is the resolver for the comments field.
+func (r *userResolver) Comments(ctx context.Context, obj *model.User) ([]*model.Comment, error) {
+	panic(fmt.Errorf("not implemented: Comments - comments"))
+}
+
+// Likes is the resolver for the likes field.
+func (r *userResolver) Likes(ctx context.Context, obj *model.User) ([]*model.Like, error) {
+	panic(fmt.Errorf("not implemented: Likes - likes"))
+}
+
+// Comment returns graph.CommentResolver implementation.
+func (r *Resolver) Comment() graph.CommentResolver { return &commentResolver{r} }
+
+// Like returns graph.LikeResolver implementation.
+func (r *Resolver) Like() graph.LikeResolver { return &likeResolver{r} }
 
 // Mutation returns graph.MutationResolver implementation.
 func (r *Resolver) Mutation() graph.MutationResolver { return &mutationResolver{r} }
 
+// Post returns graph.PostResolver implementation.
+func (r *Resolver) Post() graph.PostResolver { return &postResolver{r} }
+
 // Query returns graph.QueryResolver implementation.
 func (r *Resolver) Query() graph.QueryResolver { return &queryResolver{r} }
 
+// User returns graph.UserResolver implementation.
+func (r *Resolver) User() graph.UserResolver { return &userResolver{r} }
+
+type commentResolver struct{ *Resolver }
+type likeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
+type postResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
+	"github.com/jumpei00/graphql/backend/internal/graph/model"
 	"github.com/jumpei00/graphql/backend/internal/graph/schema"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -39,8 +40,12 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Comment() CommentResolver
+	Like() LikeResolver
 	Mutation() MutationResolver
+	Post() PostResolver
 	Query() QueryResolver
+	User() UserResolver
 }
 
 type DirectiveRoot struct {
@@ -68,12 +73,12 @@ type ComplexityRoot struct {
 		CreateComment func(childComplexity int, postID int, content string) int
 		CreateLike    func(childComplexity int, postID int) int
 		CreatePost    func(childComplexity int, content string) int
-		CreateUser    func(childComplexity int, username string, mailaddress string, password string) int
+		CreateUser    func(childComplexity int, userInput schema.UserInput) int
 		DeleteLike    func(childComplexity int, postID int) int
 		DeletePost    func(childComplexity int, id int) int
 		DeleteUser    func(childComplexity int, id int) int
 		UpdatePost    func(childComplexity int, id int, content string) int
-		UpdateUser    func(childComplexity int, id int, username string, mailaddress string, password string) int
+		UpdateUser    func(childComplexity int, id int, userInput schema.UserInput) int
 	}
 
 	Post struct {
@@ -104,21 +109,39 @@ type ComplexityRoot struct {
 	}
 }
 
+type CommentResolver interface {
+	User(ctx context.Context, obj *model.Comment) (*model.User, error)
+	Post(ctx context.Context, obj *model.Comment) (*model.Post, error)
+}
+type LikeResolver interface {
+	User(ctx context.Context, obj *model.Like) (*model.User, error)
+	Post(ctx context.Context, obj *model.Like) (*model.Post, error)
+}
 type MutationResolver interface {
-	CreateUser(ctx context.Context, username string, mailaddress string, password string) (*schema.User, error)
-	UpdateUser(ctx context.Context, id int, username string, mailaddress string, password string) (*schema.User, error)
+	CreateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error)
+	UpdateUser(ctx context.Context, id int, userInput schema.UserInput) (*model.User, error)
 	DeleteUser(ctx context.Context, id int) (bool, error)
-	CreatePost(ctx context.Context, content string) (*schema.Post, error)
-	UpdatePost(ctx context.Context, id int, content string) (*schema.Post, error)
+	CreatePost(ctx context.Context, content string) (*model.Post, error)
+	UpdatePost(ctx context.Context, id int, content string) (*model.Post, error)
 	DeletePost(ctx context.Context, id int) (bool, error)
-	CreateComment(ctx context.Context, postID int, content string) (*schema.Comment, error)
-	CreateLike(ctx context.Context, postID int) (*schema.Like, error)
+	CreateComment(ctx context.Context, postID int, content string) (*model.Comment, error)
+	CreateLike(ctx context.Context, postID int) (*model.Like, error)
 	DeleteLike(ctx context.Context, postID int) (bool, error)
 }
+type PostResolver interface {
+	User(ctx context.Context, obj *model.Post) (*model.User, error)
+	Comments(ctx context.Context, obj *model.Post) ([]*model.Comment, error)
+	Likes(ctx context.Context, obj *model.Post) ([]*model.Like, error)
+}
 type QueryResolver interface {
-	User(ctx context.Context, id int) (*schema.User, error)
-	Posts(ctx context.Context) ([]*schema.Post, error)
-	Post(ctx context.Context, id int) (*schema.Post, error)
+	User(ctx context.Context, id int) (*model.User, error)
+	Posts(ctx context.Context) ([]*model.Post, error)
+	Post(ctx context.Context, id int) (*model.Post, error)
+}
+type UserResolver interface {
+	Posts(ctx context.Context, obj *model.User) ([]*model.Post, error)
+	Comments(ctx context.Context, obj *model.User) ([]*model.Comment, error)
+	Likes(ctx context.Context, obj *model.User) ([]*model.Like, error)
 }
 
 type executableSchema struct {
@@ -256,7 +279,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUser(childComplexity, args["username"].(string), args["mailaddress"].(string), args["password"].(string)), true
+		return e.complexity.Mutation.CreateUser(childComplexity, args["userInput"].(schema.UserInput)), true
 
 	case "Mutation.deleteLike":
 		if e.complexity.Mutation.DeleteLike == nil {
@@ -316,7 +339,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateUser(childComplexity, args["id"].(int), args["username"].(string), args["mailaddress"].(string), args["password"].(string)), true
+		return e.complexity.Mutation.UpdateUser(childComplexity, args["id"].(int), args["userInput"].(schema.UserInput)), true
 
 	case "Post.comments":
 		if e.complexity.Post.Comments == nil {
@@ -461,7 +484,9 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e, 0, 0, make(chan graphql.DeferredResult)}
-	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
+	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputUserInput,
+	)
 	first := true
 
 	switch rc.Operation.Operation {
@@ -605,18 +630,15 @@ type Query {
     post(id: ID!): Post
 }
 
+input UserInput {
+    username: String!
+    mailaddress: String!
+    password: String!
+}
+
 type Mutation {
-    createUser(
-        username: String!
-        mailaddress: String!
-        password: String!
-    ): User!
-    updateUser(
-        id: ID!
-        username: String!
-        mailaddress: String!
-        password: String!
-    ): User! @isAuthenticated
+    createUser(userInput: UserInput!): User!
+    updateUser(id: ID!, userInput: UserInput!): User! @isAuthenticated
     deleteUser(id: ID!): Boolean! @isAuthenticated
 
     createPost(content: String!): Post! @isAuthenticated
@@ -693,33 +715,15 @@ func (ec *executionContext) field_Mutation_createPost_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["username"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg0 schema.UserInput
+	if tmp, ok := rawArgs["userInput"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userInput"))
+		arg0, err = ec.unmarshalNUserInput2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUserInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["username"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["mailaddress"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mailaddress"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["mailaddress"] = arg1
-	var arg2 string
-	if tmp, ok := rawArgs["password"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
-		arg2, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["password"] = arg2
+	args["userInput"] = arg0
 	return args, nil
 }
 
@@ -804,33 +808,15 @@ func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, 
 		}
 	}
 	args["id"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["username"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg1 schema.UserInput
+	if tmp, ok := rawArgs["userInput"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userInput"))
+		arg1, err = ec.unmarshalNUserInput2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUserInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["username"] = arg1
-	var arg2 string
-	if tmp, ok := rawArgs["mailaddress"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mailaddress"))
-		arg2, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["mailaddress"] = arg2
-	var arg3 string
-	if tmp, ok := rawArgs["password"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
-		arg3, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["password"] = arg3
+	args["userInput"] = arg1
 	return args, nil
 }
 
@@ -917,7 +903,7 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *schema.Comment) (ret graphql.Marshaler) {
+func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_id(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -961,7 +947,7 @@ func (ec *executionContext) fieldContext_Comment_id(_ context.Context, field gra
 	return fc, nil
 }
 
-func (ec *executionContext) _Comment_content(ctx context.Context, field graphql.CollectedField, obj *schema.Comment) (ret graphql.Marshaler) {
+func (ec *executionContext) _Comment_content(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_content(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1005,7 +991,7 @@ func (ec *executionContext) fieldContext_Comment_content(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Comment_createdAt(ctx context.Context, field graphql.CollectedField, obj *schema.Comment) (ret graphql.Marshaler) {
+func (ec *executionContext) _Comment_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1049,7 +1035,7 @@ func (ec *executionContext) fieldContext_Comment_createdAt(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _Comment_updatedAt(ctx context.Context, field graphql.CollectedField, obj *schema.Comment) (ret graphql.Marshaler) {
+func (ec *executionContext) _Comment_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_updatedAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1093,7 +1079,7 @@ func (ec *executionContext) fieldContext_Comment_updatedAt(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _Comment_user(ctx context.Context, field graphql.CollectedField, obj *schema.Comment) (ret graphql.Marshaler) {
+func (ec *executionContext) _Comment_user(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_user(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1107,7 +1093,7 @@ func (ec *executionContext) _Comment_user(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return ec.resolvers.Comment().User(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1119,17 +1105,17 @@ func (ec *executionContext) _Comment_user(ctx context.Context, field graphql.Col
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.User)
+	res := resTmp.(*model.User)
 	fc.Result = res
-	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Comment_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Comment",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -1155,7 +1141,7 @@ func (ec *executionContext) fieldContext_Comment_user(_ context.Context, field g
 	return fc, nil
 }
 
-func (ec *executionContext) _Comment_post(ctx context.Context, field graphql.CollectedField, obj *schema.Comment) (ret graphql.Marshaler) {
+func (ec *executionContext) _Comment_post(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_post(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1169,7 +1155,7 @@ func (ec *executionContext) _Comment_post(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Post, nil
+		return ec.resolvers.Comment().Post(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1181,17 +1167,17 @@ func (ec *executionContext) _Comment_post(ctx context.Context, field graphql.Col
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Post)
+	res := resTmp.(*model.Post)
 	fc.Result = res
-	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx, field.Selections, res)
+	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Comment_post(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Comment",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -1215,7 +1201,7 @@ func (ec *executionContext) fieldContext_Comment_post(_ context.Context, field g
 	return fc, nil
 }
 
-func (ec *executionContext) _Like_id(ctx context.Context, field graphql.CollectedField, obj *schema.Like) (ret graphql.Marshaler) {
+func (ec *executionContext) _Like_id(ctx context.Context, field graphql.CollectedField, obj *model.Like) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Like_id(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1259,7 +1245,7 @@ func (ec *executionContext) fieldContext_Like_id(_ context.Context, field graphq
 	return fc, nil
 }
 
-func (ec *executionContext) _Like_createdAt(ctx context.Context, field graphql.CollectedField, obj *schema.Like) (ret graphql.Marshaler) {
+func (ec *executionContext) _Like_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Like) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Like_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1303,7 +1289,7 @@ func (ec *executionContext) fieldContext_Like_createdAt(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Like_user(ctx context.Context, field graphql.CollectedField, obj *schema.Like) (ret graphql.Marshaler) {
+func (ec *executionContext) _Like_user(ctx context.Context, field graphql.CollectedField, obj *model.Like) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Like_user(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1317,7 +1303,7 @@ func (ec *executionContext) _Like_user(ctx context.Context, field graphql.Collec
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return ec.resolvers.Like().User(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1329,17 +1315,17 @@ func (ec *executionContext) _Like_user(ctx context.Context, field graphql.Collec
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.User)
+	res := resTmp.(*model.User)
 	fc.Result = res
-	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Like_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Like",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -1365,7 +1351,7 @@ func (ec *executionContext) fieldContext_Like_user(_ context.Context, field grap
 	return fc, nil
 }
 
-func (ec *executionContext) _Like_post(ctx context.Context, field graphql.CollectedField, obj *schema.Like) (ret graphql.Marshaler) {
+func (ec *executionContext) _Like_post(ctx context.Context, field graphql.CollectedField, obj *model.Like) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Like_post(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1379,7 +1365,7 @@ func (ec *executionContext) _Like_post(ctx context.Context, field graphql.Collec
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Post, nil
+		return ec.resolvers.Like().Post(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1391,17 +1377,17 @@ func (ec *executionContext) _Like_post(ctx context.Context, field graphql.Collec
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Post)
+	res := resTmp.(*model.Post)
 	fc.Result = res
-	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx, field.Selections, res)
+	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Like_post(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Like",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -1439,7 +1425,7 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUser(rctx, fc.Args["username"].(string), fc.Args["mailaddress"].(string), fc.Args["password"].(string))
+		return ec.resolvers.Mutation().CreateUser(rctx, fc.Args["userInput"].(schema.UserInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1451,9 +1437,9 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.User)
+	res := resTmp.(*model.User)
 	fc.Result = res
-	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1513,7 +1499,7 @@ func (ec *executionContext) _Mutation_updateUser(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateUser(rctx, fc.Args["id"].(int), fc.Args["username"].(string), fc.Args["mailaddress"].(string), fc.Args["password"].(string))
+			return ec.resolvers.Mutation().UpdateUser(rctx, fc.Args["id"].(int), fc.Args["userInput"].(schema.UserInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.IsAuthenticated == nil {
@@ -1529,10 +1515,10 @@ func (ec *executionContext) _Mutation_updateUser(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*schema.User); ok {
+		if data, ok := tmp.(*model.User); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/schema.User`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/model.User`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1544,9 +1530,9 @@ func (ec *executionContext) _Mutation_updateUser(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.User)
+	res := resTmp.(*model.User)
 	fc.Result = res
-	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1697,10 +1683,10 @@ func (ec *executionContext) _Mutation_createPost(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*schema.Post); ok {
+		if data, ok := tmp.(*model.Post); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/schema.Post`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/model.Post`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1712,9 +1698,9 @@ func (ec *executionContext) _Mutation_createPost(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Post)
+	res := resTmp.(*model.Post)
 	fc.Result = res
-	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx, field.Selections, res)
+	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createPost(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1788,10 +1774,10 @@ func (ec *executionContext) _Mutation_updatePost(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*schema.Post); ok {
+		if data, ok := tmp.(*model.Post); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/schema.Post`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/model.Post`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1803,9 +1789,9 @@ func (ec *executionContext) _Mutation_updatePost(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Post)
+	res := resTmp.(*model.Post)
 	fc.Result = res
-	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx, field.Selections, res)
+	return ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_updatePost(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1954,10 +1940,10 @@ func (ec *executionContext) _Mutation_createComment(ctx context.Context, field g
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*schema.Comment); ok {
+		if data, ok := tmp.(*model.Comment); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/schema.Comment`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/model.Comment`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1969,9 +1955,9 @@ func (ec *executionContext) _Mutation_createComment(ctx context.Context, field g
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Comment)
+	res := resTmp.(*model.Comment)
 	fc.Result = res
-	return ec.marshalNComment2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐComment(ctx, field.Selections, res)
+	return ec.marshalNComment2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐComment(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createComment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2043,10 +2029,10 @@ func (ec *executionContext) _Mutation_createLike(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*schema.Like); ok {
+		if data, ok := tmp.(*model.Like); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/schema.Like`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/model.Like`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2058,9 +2044,9 @@ func (ec *executionContext) _Mutation_createLike(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Like)
+	res := resTmp.(*model.Like)
 	fc.Result = res
-	return ec.marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLike(ctx, field.Selections, res)
+	return ec.marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLike(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createLike(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2172,7 +2158,7 @@ func (ec *executionContext) fieldContext_Mutation_deleteLike(ctx context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_id(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_id(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_id(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2216,7 +2202,7 @@ func (ec *executionContext) fieldContext_Post_id(_ context.Context, field graphq
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_content(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_content(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_content(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2260,7 +2246,7 @@ func (ec *executionContext) fieldContext_Post_content(_ context.Context, field g
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_createdAt(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2304,7 +2290,7 @@ func (ec *executionContext) fieldContext_Post_createdAt(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_updatedAt(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_updatedAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2348,7 +2334,7 @@ func (ec *executionContext) fieldContext_Post_updatedAt(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_user(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_user(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_user(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2362,7 +2348,7 @@ func (ec *executionContext) _Post_user(ctx context.Context, field graphql.Collec
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return ec.resolvers.Post().User(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2374,17 +2360,17 @@ func (ec *executionContext) _Post_user(ctx context.Context, field graphql.Collec
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*schema.User)
+	res := resTmp.(*model.User)
 	fc.Result = res
-	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Post_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Post",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -2410,7 +2396,7 @@ func (ec *executionContext) fieldContext_Post_user(_ context.Context, field grap
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_comments(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2424,7 +2410,7 @@ func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Comments, nil
+		return ec.resolvers.Post().Comments(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2436,17 +2422,17 @@ func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*schema.Comment)
+	res := resTmp.([]*model.Comment)
 	fc.Result = res
-	return ec.marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐCommentᚄ(ctx, field.Selections, res)
+	return ec.marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐCommentᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Post_comments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Post",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -2468,7 +2454,7 @@ func (ec *executionContext) fieldContext_Post_comments(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_likes(ctx context.Context, field graphql.CollectedField, obj *schema.Post) (ret graphql.Marshaler) {
+func (ec *executionContext) _Post_likes(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_likes(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2482,7 +2468,7 @@ func (ec *executionContext) _Post_likes(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Likes, nil
+		return ec.resolvers.Post().Likes(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2494,17 +2480,17 @@ func (ec *executionContext) _Post_likes(ctx context.Context, field graphql.Colle
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*schema.Like)
+	res := resTmp.([]*model.Like)
 	fc.Result = res
-	return ec.marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLikeᚄ(ctx, field.Selections, res)
+	return ec.marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLikeᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Post_likes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Post",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -2553,10 +2539,10 @@ func (ec *executionContext) _Query_user(ctx context.Context, field graphql.Colle
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*schema.User); ok {
+		if data, ok := tmp.(*model.User); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/schema.User`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jumpei00/graphql/backend/internal/graph/model.User`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2565,9 +2551,9 @@ func (ec *executionContext) _Query_user(ctx context.Context, field graphql.Colle
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*schema.User)
+	res := resTmp.(*model.User)
 	fc.Result = res
-	return ec.marshalOUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx, field.Selections, res)
+	return ec.marshalOUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2638,9 +2624,9 @@ func (ec *executionContext) _Query_posts(ctx context.Context, field graphql.Coll
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*schema.Post)
+	res := resTmp.([]*model.Post)
 	fc.Result = res
-	return ec.marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPostᚄ(ctx, field.Selections, res)
+	return ec.marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPostᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_posts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2695,9 +2681,9 @@ func (ec *executionContext) _Query_post(ctx context.Context, field graphql.Colle
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*schema.Post)
+	res := resTmp.(*model.Post)
 	fc.Result = res
-	return ec.marshalOPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx, field.Selections, res)
+	return ec.marshalOPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2869,7 +2855,7 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_id(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2913,7 +2899,7 @@ func (ec *executionContext) fieldContext_User_id(_ context.Context, field graphq
 	return fc, nil
 }
 
-func (ec *executionContext) _User_username(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_username(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_username(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -2957,7 +2943,7 @@ func (ec *executionContext) fieldContext_User_username(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _User_mailaddress(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_mailaddress(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_mailaddress(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -3001,7 +2987,7 @@ func (ec *executionContext) fieldContext_User_mailaddress(_ context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _User_createdAt(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -3045,7 +3031,7 @@ func (ec *executionContext) fieldContext_User_createdAt(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _User_updatedAt(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_updatedAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -3089,7 +3075,7 @@ func (ec *executionContext) fieldContext_User_updatedAt(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _User_posts(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_posts(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_posts(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -3103,7 +3089,7 @@ func (ec *executionContext) _User_posts(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Posts, nil
+		return ec.resolvers.User().Posts(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3115,17 +3101,17 @@ func (ec *executionContext) _User_posts(ctx context.Context, field graphql.Colle
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*schema.Post)
+	res := resTmp.([]*model.Post)
 	fc.Result = res
-	return ec.marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPostᚄ(ctx, field.Selections, res)
+	return ec.marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPostᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_User_posts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -3149,7 +3135,7 @@ func (ec *executionContext) fieldContext_User_posts(_ context.Context, field gra
 	return fc, nil
 }
 
-func (ec *executionContext) _User_comments(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_comments(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_comments(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -3163,7 +3149,7 @@ func (ec *executionContext) _User_comments(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Comments, nil
+		return ec.resolvers.User().Comments(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3175,17 +3161,17 @@ func (ec *executionContext) _User_comments(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*schema.Comment)
+	res := resTmp.([]*model.Comment)
 	fc.Result = res
-	return ec.marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐCommentᚄ(ctx, field.Selections, res)
+	return ec.marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐCommentᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_User_comments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -3207,7 +3193,7 @@ func (ec *executionContext) fieldContext_User_comments(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _User_likes(ctx context.Context, field graphql.CollectedField, obj *schema.User) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_likes(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_likes(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -3221,7 +3207,7 @@ func (ec *executionContext) _User_likes(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Likes, nil
+		return ec.resolvers.User().Likes(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3233,17 +3219,17 @@ func (ec *executionContext) _User_likes(ctx context.Context, field graphql.Colle
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*schema.Like)
+	res := resTmp.([]*model.Like)
 	fc.Result = res
-	return ec.marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLikeᚄ(ctx, field.Selections, res)
+	return ec.marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLikeᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_User_likes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -5034,6 +5020,47 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(_ context.Context
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputUserInput(ctx context.Context, obj interface{}) (schema.UserInput, error) {
+	var it schema.UserInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"username", "mailaddress", "password"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "username":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Username = data
+		case "mailaddress":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mailaddress"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Mailaddress = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -5044,7 +5071,7 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(_ context.Context
 
 var commentImplementors = []string{"Comment"}
 
-func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *schema.Comment) graphql.Marshaler {
+func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *model.Comment) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, commentImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -5056,33 +5083,95 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 		case "id":
 			out.Values[i] = ec._Comment_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "content":
 			out.Values[i] = ec._Comment_content(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._Comment_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Comment_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "user":
-			out.Values[i] = ec._Comment_user(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_user(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "post":
-			out.Values[i] = ec._Comment_post(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_post(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5108,7 +5197,7 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 
 var likeImplementors = []string{"Like"}
 
-func (ec *executionContext) _Like(ctx context.Context, sel ast.SelectionSet, obj *schema.Like) graphql.Marshaler {
+func (ec *executionContext) _Like(ctx context.Context, sel ast.SelectionSet, obj *model.Like) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, likeImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -5120,23 +5209,85 @@ func (ec *executionContext) _Like(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._Like_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._Like_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "user":
-			out.Values[i] = ec._Like_user(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Like_user(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "post":
-			out.Values[i] = ec._Like_post(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Like_post(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5267,7 +5418,7 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 var postImplementors = []string{"Post"}
 
-func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj *schema.Post) graphql.Marshaler {
+func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj *model.Post) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, postImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -5279,38 +5430,131 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._Post_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "content":
 			out.Values[i] = ec._Post_content(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._Post_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Post_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "user":
-			out.Values[i] = ec._Post_user(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_user(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "comments":
-			out.Values[i] = ec._Post_comments(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_comments(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "likes":
-			out.Values[i] = ec._Post_likes(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_likes(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5446,7 +5690,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 
 var userImplementors = []string{"User"}
 
-func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj *schema.User) graphql.Marshaler {
+func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj *model.User) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, userImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -5458,43 +5702,136 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "username":
 			out.Values[i] = ec._User_username(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "mailaddress":
 			out.Values[i] = ec._User_mailaddress(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._User_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._User_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "posts":
-			out.Values[i] = ec._User_posts(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_posts(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "comments":
-			out.Values[i] = ec._User_comments(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_comments(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "likes":
-			out.Values[i] = ec._User_likes(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_likes(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5859,11 +6196,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNComment2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐComment(ctx context.Context, sel ast.SelectionSet, v schema.Comment) graphql.Marshaler {
+func (ec *executionContext) marshalNComment2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐComment(ctx context.Context, sel ast.SelectionSet, v model.Comment) graphql.Marshaler {
 	return ec._Comment(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐCommentᚄ(ctx context.Context, sel ast.SelectionSet, v []*schema.Comment) graphql.Marshaler {
+func (ec *executionContext) marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐCommentᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Comment) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -5887,7 +6224,7 @@ func (ec *executionContext) marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgrap
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNComment2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐComment(ctx, sel, v[i])
+			ret[i] = ec.marshalNComment2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐComment(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -5907,7 +6244,7 @@ func (ec *executionContext) marshalNComment2ᚕᚖgithubᚗcomᚋjumpei00ᚋgrap
 	return ret
 }
 
-func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐComment(ctx context.Context, sel ast.SelectionSet, v *schema.Comment) graphql.Marshaler {
+func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐComment(ctx context.Context, sel ast.SelectionSet, v *model.Comment) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -5947,11 +6284,11 @@ func (ec *executionContext) marshalNID2int(ctx context.Context, sel ast.Selectio
 	return res
 }
 
-func (ec *executionContext) marshalNLike2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLike(ctx context.Context, sel ast.SelectionSet, v schema.Like) graphql.Marshaler {
+func (ec *executionContext) marshalNLike2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLike(ctx context.Context, sel ast.SelectionSet, v model.Like) graphql.Marshaler {
 	return ec._Like(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLikeᚄ(ctx context.Context, sel ast.SelectionSet, v []*schema.Like) graphql.Marshaler {
+func (ec *executionContext) marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLikeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Like) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -5975,7 +6312,7 @@ func (ec *executionContext) marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphql
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLike(ctx, sel, v[i])
+			ret[i] = ec.marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLike(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -5995,7 +6332,7 @@ func (ec *executionContext) marshalNLike2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphql
 	return ret
 }
 
-func (ec *executionContext) marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐLike(ctx context.Context, sel ast.SelectionSet, v *schema.Like) graphql.Marshaler {
+func (ec *executionContext) marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐLike(ctx context.Context, sel ast.SelectionSet, v *model.Like) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -6005,11 +6342,11 @@ func (ec *executionContext) marshalNLike2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋ
 	return ec._Like(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNPost2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx context.Context, sel ast.SelectionSet, v schema.Post) graphql.Marshaler {
+func (ec *executionContext) marshalNPost2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v model.Post) graphql.Marshaler {
 	return ec._Post(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPostᚄ(ctx context.Context, sel ast.SelectionSet, v []*schema.Post) graphql.Marshaler {
+func (ec *executionContext) marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPostᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Post) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -6033,7 +6370,7 @@ func (ec *executionContext) marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphql
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx, sel, v[i])
+			ret[i] = ec.marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -6053,7 +6390,7 @@ func (ec *executionContext) marshalNPost2ᚕᚖgithubᚗcomᚋjumpei00ᚋgraphql
 	return ret
 }
 
-func (ec *executionContext) marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx context.Context, sel ast.SelectionSet, v *schema.Post) graphql.Marshaler {
+func (ec *executionContext) marshalNPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v *model.Post) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -6078,11 +6415,11 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
-func (ec *executionContext) marshalNUser2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx context.Context, sel ast.SelectionSet, v schema.User) graphql.Marshaler {
+func (ec *executionContext) marshalNUser2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v model.User) graphql.Marshaler {
 	return ec._User(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx context.Context, sel ast.SelectionSet, v *schema.User) graphql.Marshaler {
+func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -6090,6 +6427,11 @@ func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋ
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNUserInput2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUserInput(ctx context.Context, v interface{}) (schema.UserInput, error) {
+	res, err := ec.unmarshalInputUserInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -6371,7 +6713,7 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) marshalOPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐPost(ctx context.Context, sel ast.SelectionSet, v *schema.Post) graphql.Marshaler {
+func (ec *executionContext) marshalOPost2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v *model.Post) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -6394,7 +6736,7 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUser(ctx context.Context, sel ast.SelectionSet, v *schema.User) graphql.Marshaler {
+func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
