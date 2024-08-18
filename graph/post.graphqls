@@ -40,7 +40,7 @@ type Like {
 }
 
 type Query {
-    user(id: ID!): User @isAuthenticated
+    user: User @isAuthenticated
     posts: [Post!]!
     post(id: ID!): Post
 }
@@ -53,8 +53,8 @@ input UserInput {
 
 type Mutation {
     createUser(userInput: UserInput!): User!
-    updateUser(id: ID!, userInput: UserInput!): User! @isAuthenticated
-    deleteUser(id: ID!): Boolean! @isAuthenticated
+    updateUser(userInput: UserInput!): User! @isAuthenticated
+    deleteUser: Boolean! @isAuthenticated
 
     createPost(content: String!): Post! @isAuthenticated
     updatePost(id: ID!, content: String!): Post! @isAuthenticated

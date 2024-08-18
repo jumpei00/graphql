@@ -76,9 +76,9 @@ type ComplexityRoot struct {
 		CreateUser    func(childComplexity int, userInput schema.UserInput) int
 		DeleteLike    func(childComplexity int, postID int) int
 		DeletePost    func(childComplexity int, id int) int
-		DeleteUser    func(childComplexity int, id int) int
+		DeleteUser    func(childComplexity int) int
 		UpdatePost    func(childComplexity int, id int, content string) int
-		UpdateUser    func(childComplexity int, id int, userInput schema.UserInput) int
+		UpdateUser    func(childComplexity int, userInput schema.UserInput) int
 	}
 
 	Post struct {
@@ -94,7 +94,7 @@ type ComplexityRoot struct {
 	Query struct {
 		Post  func(childComplexity int, id int) int
 		Posts func(childComplexity int) int
-		User  func(childComplexity int, id int) int
+		User  func(childComplexity int) int
 	}
 
 	User struct {
@@ -119,8 +119,8 @@ type LikeResolver interface {
 }
 type MutationResolver interface {
 	CreateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error)
-	UpdateUser(ctx context.Context, id int, userInput schema.UserInput) (*model.User, error)
-	DeleteUser(ctx context.Context, id int) (bool, error)
+	UpdateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error)
+	DeleteUser(ctx context.Context) (bool, error)
 	CreatePost(ctx context.Context, content string) (*model.Post, error)
 	UpdatePost(ctx context.Context, id int, content string) (*model.Post, error)
 	DeletePost(ctx context.Context, id int) (bool, error)
@@ -134,7 +134,7 @@ type PostResolver interface {
 	Likes(ctx context.Context, obj *model.Post) ([]*model.Like, error)
 }
 type QueryResolver interface {
-	User(ctx context.Context, id int) (*model.User, error)
+	User(ctx context.Context) (*model.User, error)
 	Posts(ctx context.Context) ([]*model.Post, error)
 	Post(ctx context.Context, id int) (*model.Post, error)
 }
@@ -310,12 +310,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_deleteUser_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.DeleteUser(childComplexity, args["id"].(int)), true
+		return e.complexity.Mutation.DeleteUser(childComplexity), true
 
 	case "Mutation.updatePost":
 		if e.complexity.Mutation.UpdatePost == nil {
@@ -339,7 +334,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateUser(childComplexity, args["id"].(int), args["userInput"].(schema.UserInput)), true
+		return e.complexity.Mutation.UpdateUser(childComplexity, args["userInput"].(schema.UserInput)), true
 
 	case "Post.comments":
 		if e.complexity.Post.Comments == nil {
@@ -414,12 +409,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_user_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.User(childComplexity, args["id"].(int)), true
+		return e.complexity.Query.User(childComplexity), true
 
 	case "User.comments":
 		if e.complexity.User.Comments == nil {
@@ -625,7 +615,7 @@ type Like {
 }
 
 type Query {
-    user(id: ID!): User @isAuthenticated
+    user: User @isAuthenticated
     posts: [Post!]!
     post(id: ID!): Post
 }
@@ -638,8 +628,8 @@ input UserInput {
 
 type Mutation {
     createUser(userInput: UserInput!): User!
-    updateUser(id: ID!, userInput: UserInput!): User! @isAuthenticated
-    deleteUser(id: ID!): Boolean! @isAuthenticated
+    updateUser(userInput: UserInput!): User! @isAuthenticated
+    deleteUser: Boolean! @isAuthenticated
 
     createPost(content: String!): Post! @isAuthenticated
     updatePost(id: ID!, content: String!): Post! @isAuthenticated
@@ -757,21 +747,6 @@ func (ec *executionContext) field_Mutation_deletePost_args(ctx context.Context, 
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_deleteUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 int
-	if tmp, ok := rawArgs["id"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2int(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["id"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Mutation_updatePost_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -799,24 +774,15 @@ func (ec *executionContext) field_Mutation_updatePost_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 int
-	if tmp, ok := rawArgs["id"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2int(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["id"] = arg0
-	var arg1 schema.UserInput
+	var arg0 schema.UserInput
 	if tmp, ok := rawArgs["userInput"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userInput"))
-		arg1, err = ec.unmarshalNUserInput2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUserInput(ctx, tmp)
+		arg0, err = ec.unmarshalNUserInput2githubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋschemaᚐUserInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["userInput"] = arg1
+	args["userInput"] = arg0
 	return args, nil
 }
 
@@ -836,21 +802,6 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 }
 
 func (ec *executionContext) field_Query_post_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 int
-	if tmp, ok := rawArgs["id"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2int(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["id"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_user_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 int
@@ -1499,7 +1450,7 @@ func (ec *executionContext) _Mutation_updateUser(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateUser(rctx, fc.Args["id"].(int), fc.Args["userInput"].(schema.UserInput))
+			return ec.resolvers.Mutation().UpdateUser(rctx, fc.Args["userInput"].(schema.UserInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.IsAuthenticated == nil {
@@ -1592,7 +1543,7 @@ func (ec *executionContext) _Mutation_deleteUser(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().DeleteUser(rctx, fc.Args["id"].(int))
+			return ec.resolvers.Mutation().DeleteUser(rctx)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.IsAuthenticated == nil {
@@ -1628,7 +1579,7 @@ func (ec *executionContext) _Mutation_deleteUser(ctx context.Context, field grap
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_deleteUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_deleteUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -1637,17 +1588,6 @@ func (ec *executionContext) fieldContext_Mutation_deleteUser(ctx context.Context
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_deleteUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -2523,7 +2463,7 @@ func (ec *executionContext) _Query_user(ctx context.Context, field graphql.Colle
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().User(rctx, fc.Args["id"].(int))
+			return ec.resolvers.Query().User(rctx)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.IsAuthenticated == nil {
@@ -2556,7 +2496,7 @@ func (ec *executionContext) _Query_user(ctx context.Context, field graphql.Colle
 	return ec.marshalOUser2ᚖgithubᚗcomᚋjumpei00ᚋgraphqlᚋbackendᚋinternalᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -2583,17 +2523,6 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_user_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }

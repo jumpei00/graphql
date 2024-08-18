@@ -83,12 +83,12 @@ func (r *mutationResolver) CreateUser(ctx context.Context, userInput schema.User
 }
 
 // UpdateUser is the resolver for the updateUser field.
-func (r *mutationResolver) UpdateUser(ctx context.Context, id int, userInput schema.UserInput) (*model.User, error) {
+func (r *mutationResolver) UpdateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error) {
 	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
 }
 
 // DeleteUser is the resolver for the deleteUser field.
-func (r *mutationResolver) DeleteUser(ctx context.Context, id int) (bool, error) {
+func (r *mutationResolver) DeleteUser(ctx context.Context) (bool, error) {
 	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
 }
 
@@ -181,8 +181,8 @@ func (r *postResolver) Likes(ctx context.Context, obj *model.Post) ([]*model.Lik
 }
 
 // User is the resolver for the user field.
-func (r *queryResolver) User(ctx context.Context, id int) (*model.User, error) {
-	user, err := r.userRepository.GetByID(ctx, id)
+func (r *queryResolver) User(ctx context.Context) (*model.User, error) {
+	user, err := r.userRepository.GetByID(ctx, 1)
 	if err != nil {
 		return nil, err
 	}
