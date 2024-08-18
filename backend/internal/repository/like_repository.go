@@ -1,9 +1,13 @@
 package repository
 
-import "github.com/jumpei00/graphql/backend/internal/domain"
+import (
+	"context"
+
+	"github.com/jumpei00/graphql/backend/internal/domain"
+)
 
 type LikeRepository interface {
-	GetAllByPostID(postID int) ([]domain.Like, error)
-	Create(like *domain.Like) error
-	Delete(id int) error
+	GetAllByPostID(ctx context.Context, postID int) ([]domain.Like, error)
+	Create(ctx context.Context, like *domain.Like) error
+	Delete(ctx context.Context, id int) error
 }

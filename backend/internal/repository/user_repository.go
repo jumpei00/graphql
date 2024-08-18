@@ -1,10 +1,14 @@
 package repository
 
-import "github.com/jumpei00/graphql/backend/internal/domain"
+import (
+	"context"
+
+	"github.com/jumpei00/graphql/backend/internal/domain"
+)
 
 type UserRepository interface {
-	GetByID(id int) (*domain.User, error)
-	Create(user *domain.User) error
-	Update(user *domain.User) error
-	Delete(id int) error
+	GetByID(ctx context.Context, id int) (*domain.User, error)
+	Create(ctx context.Context, user *domain.User) error
+	Update(ctx context.Context, user *domain.User) error
+	Delete(ctx context.Context, id int) error
 }

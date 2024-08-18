@@ -1,11 +1,15 @@
 package repository
 
-import "github.com/jumpei00/graphql/backend/internal/domain"
+import (
+	"context"
+
+	"github.com/jumpei00/graphql/backend/internal/domain"
+)
 
 type PostRepository interface {
-	GetByID(id int) (*domain.Post, error)
-	GetAll() ([]domain.Post, error)
-	Create(post *domain.Post) error
-	Update(post *domain.Post) error
-	Delete(id int) error
+	GetByID(ctx context.Context, id int) (*domain.Post, error)
+	GetAll(ctx context.Context) ([]domain.Post, error)
+	Create(ctx context.Context, post *domain.Post) error
+	Update(ctx context.Context, post *domain.Post) error
+	Delete(ctx context.Context, id int) error
 }
