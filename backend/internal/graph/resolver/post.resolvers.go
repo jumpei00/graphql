@@ -15,22 +15,66 @@ import (
 
 // User is the resolver for the user field.
 func (r *commentResolver) User(ctx context.Context, obj *model.Comment) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+	user, err := r.userRepository.GetByID(ctx, obj.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:          user.ID,
+		Username:    user.Username,
+		Mailaddress: user.Mailaddress,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
 }
 
 // Post is the resolver for the post field.
 func (r *commentResolver) Post(ctx context.Context, obj *model.Comment) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	post, err := r.postRepository.GetByID(ctx, obj.PostID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Post{
+		ID:        post.ID,
+		Content:   post.Content,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+		UserID:    post.UserID,
+	}, nil
 }
 
 // User is the resolver for the user field.
 func (r *likeResolver) User(ctx context.Context, obj *model.Like) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+	user, err := r.userRepository.GetByID(ctx, obj.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:          user.ID,
+		Username:    user.Username,
+		Mailaddress: user.Mailaddress,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
 }
 
 // Post is the resolver for the post field.
 func (r *likeResolver) Post(ctx context.Context, obj *model.Like) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	post, err := r.postRepository.GetByID(ctx, obj.PostID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Post{
+		ID:        post.ID,
+		Content:   post.Content,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+		UserID:    post.UserID,
+	}, nil
 }
 
 // CreateUser is the resolver for the createUser field.
@@ -80,47 +124,176 @@ func (r *mutationResolver) DeleteLike(ctx context.Context, postID int) (bool, er
 
 // User is the resolver for the user field.
 func (r *postResolver) User(ctx context.Context, obj *model.Post) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+	user, err := r.userRepository.GetByID(ctx, obj.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:          user.ID,
+		Username:    user.Username,
+		Mailaddress: user.Mailaddress,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
 }
 
 // Comments is the resolver for the comments field.
 func (r *postResolver) Comments(ctx context.Context, obj *model.Post) ([]*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: Comments - comments"))
+	comments, err := r.commentRepository.GetAllByPostID(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var commentsModel []*model.Comment
+	for _, comment := range comments {
+		commentsModel = append(commentsModel, &model.Comment{
+			ID:        comment.ID,
+			Content:   comment.Content,
+			CreatedAt: comment.CreatedAt,
+			UpdatedAt: comment.UpdatedAt,
+			UserID:    comment.UserID,
+			PostID:    comment.PostID,
+		})
+	}
+
+	return commentsModel, nil
 }
 
 // Likes is the resolver for the likes field.
 func (r *postResolver) Likes(ctx context.Context, obj *model.Post) ([]*model.Like, error) {
-	panic(fmt.Errorf("not implemented: Likes - likes"))
+	likes, err := r.likeRepository.GetAllByPostID(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var likesModel []*model.Like
+	for _, like := range likes {
+		likesModel = append(likesModel, &model.Like{
+			ID:        like.ID,
+			CreatedAt: like.CreatedAt,
+			PostID:    like.PostID,
+			UserID:    like.UserID,
+		})
+	}
+
+	return likesModel, nil
 }
 
 // User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context, id int) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+	user, err := r.userRepository.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:          user.ID,
+		Username:    user.Username,
+		Mailaddress: user.Mailaddress,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
 }
 
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context) ([]*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Posts - posts"))
+	posts, err := r.postRepository.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var postsModel []*model.Post
+	for _, post := range posts {
+		postsModel = append(postsModel, &model.Post{
+			ID:        post.ID,
+			Content:   post.Content,
+			CreatedAt: post.CreatedAt,
+			UpdatedAt: post.UpdatedAt,
+			UserID:    post.UserID,
+		})
+	}
+
+	return postsModel, nil
 }
 
 // Post is the resolver for the post field.
 func (r *queryResolver) Post(ctx context.Context, id int) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	post, err := r.postRepository.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Post{
+		ID:        post.ID,
+		Content:   post.Content,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+		UserID:    post.UserID,
+	}, nil
 }
 
 // Posts is the resolver for the posts field.
 func (r *userResolver) Posts(ctx context.Context, obj *model.User) ([]*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Posts - posts"))
+	posts, err := r.postRepository.GetAllByUserID(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var postsModel []*model.Post
+	for _, post := range posts {
+		postsModel = append(postsModel, &model.Post{
+			ID:        post.ID,
+			Content:   post.Content,
+			CreatedAt: post.CreatedAt,
+			UpdatedAt: post.UpdatedAt,
+			UserID:    post.UserID,
+		})
+	}
+
+	return postsModel, nil
 }
 
 // Comments is the resolver for the comments field.
 func (r *userResolver) Comments(ctx context.Context, obj *model.User) ([]*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: Comments - comments"))
+	comments, err := r.commentRepository.GetAllByUserID(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var commentsModel []*model.Comment
+	for _, comment := range comments {
+		commentsModel = append(commentsModel, &model.Comment{
+			ID:        comment.ID,
+			Content:   comment.Content,
+			CreatedAt: comment.CreatedAt,
+			UpdatedAt: comment.UpdatedAt,
+			UserID:    comment.UserID,
+			PostID:    comment.PostID,
+		})
+	}
+
+	return commentsModel, nil
 }
 
 // Likes is the resolver for the likes field.
 func (r *userResolver) Likes(ctx context.Context, obj *model.User) ([]*model.Like, error) {
-	panic(fmt.Errorf("not implemented: Likes - likes"))
+	likes, err := r.likeRepository.GetAllByUserID(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var likesModel []*model.Like
+	for _, like := range likes {
+		likesModel = append(likesModel, &model.Like{
+			ID:        like.ID,
+			CreatedAt: like.CreatedAt,
+			PostID:    like.PostID,
+			UserID:    like.UserID,
+		})
+	}
+
+	return likesModel, nil
 }
 
 // Comment returns graph.CommentResolver implementation.
