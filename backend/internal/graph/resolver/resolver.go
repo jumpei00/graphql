@@ -13,3 +13,19 @@ type Resolver struct {
 	commentRepository repository.CommentRepository
 	likeRepository    repository.LikeRepository
 }
+
+func NewResolver(
+	sessionRepository repository.SessionRepository,
+	userRepository repository.UserRepository,
+	postRepository repository.PostRepository,
+	commentRepository repository.CommentRepository,
+	likeRepository repository.LikeRepository,
+) *Resolver {
+	return &Resolver{
+		sessionRepository: sessionRepository,
+		userRepository:    userRepository,
+		postRepository:    postRepository,
+		commentRepository: commentRepository,
+		likeRepository:    likeRepository,
+	}
+}

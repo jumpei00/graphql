@@ -126,7 +126,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, userInput schema.User
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error) {
-	session, err := r.sessionRepository.GetByToken(ctx)
+	session, err := r.sessionRepository.GetByToken(ctx, ctx.Value(middleware.SessionKey).(string))
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, userInput schema.User
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context) (bool, error) {
-	session, err := r.sessionRepository.GetByToken(ctx)
+	session, err := r.sessionRepository.GetByToken(ctx, ctx.Value(middleware.SessionKey).(string))
 	if err != nil {
 		return false, err
 	}
@@ -171,7 +171,7 @@ func (r *mutationResolver) DeleteUser(ctx context.Context) (bool, error) {
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, content string) (*model.Post, error) {
-	session, err := r.sessionRepository.GetByToken(ctx)
+	session, err := r.sessionRepository.GetByToken(ctx, ctx.Value(middleware.SessionKey).(string))
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id int) (bool, error)
 
 // CreateComment is the resolver for the createComment field.
 func (r *mutationResolver) CreateComment(ctx context.Context, postID int, content string) (*model.Comment, error) {
-	session, err := r.sessionRepository.GetByToken(ctx)
+	session, err := r.sessionRepository.GetByToken(ctx, ctx.Value(middleware.SessionKey).(string))
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (r *mutationResolver) CreateComment(ctx context.Context, postID int, conten
 
 // CreateLike is the resolver for the createLike field.
 func (r *mutationResolver) CreateLike(ctx context.Context, postID int) (*model.Like, error) {
-	session, err := r.sessionRepository.GetByToken(ctx)
+	session, err := r.sessionRepository.GetByToken(ctx, ctx.Value(middleware.SessionKey).(string))
 	if err != nil {
 		return nil, err
 	}
