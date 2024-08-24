@@ -63,5 +63,5 @@ type Mutation {
     createComment(postID: ID!, content: String!): Comment! @isAuthenticated
 
     createLike(postID: ID!): Like! @isAuthenticated
-    deleteLike(postID: ID!): Boolean! @isAuthenticated
+    deleteLike(id: ID!): Boolean! @isAuthenticated
 }

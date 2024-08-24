@@ -6,9 +6,12 @@ package resolver
 
 import (
 	"context"
-	"fmt"
+	"net/http"
+	"time"
 
+	"github.com/jumpei00/graphql/backend/internal/domain"
 	"github.com/jumpei00/graphql/backend/internal/graph"
+	"github.com/jumpei00/graphql/backend/internal/graph/middleware"
 	"github.com/jumpei00/graphql/backend/internal/graph/model"
 	"github.com/jumpei00/graphql/backend/internal/graph/schema"
 )
@@ -79,47 +82,211 @@ func (r *likeResolver) Post(ctx context.Context, obj *model.Like) (*model.Post, 
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
+	user := domain.User{
+		Username:    userInput.Username,
+		Mailaddress: userInput.Mailaddress,
+		Password:    userInput.Password,
+	}
+
+	newUser, err := r.userRepository.Create(ctx, &user)
+	if err != nil {
+		return nil, err
+	}
+
+	session := domain.Session{
+		UserID:    newUser.ID,
+		CreatedAt: time.Now(),
+	}
+
+	token, err := r.sessionRepository.Create(ctx, &session)
+	if err != nil {
+		return nil, err
+	}
+
+	if rw, ok := ctx.Value(middleware.ResponseWriterKey).(http.ResponseWriter); ok {
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "graphql_sns_token",
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   3600 * 24 * 7,
+		})
+	}
+
+	return &model.User{
+		ID:          newUser.ID,
+		Username:    newUser.Username,
+		Mailaddress: newUser.Mailaddress,
+		CreatedAt:   newUser.CreatedAt,
+		UpdatedAt:   newUser.UpdatedAt,
+	}, nil
 }
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, userInput schema.UserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
+	session, err := r.sessionRepository.GetByToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := r.userRepository.GetByID(ctx, session.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.Username = userInput.Username
+	user.Mailaddress = userInput.Mailaddress
+	user.Password = userInput.Password
+
+	updatedUser, err := r.userRepository.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:          updatedUser.ID,
+		Username:    updatedUser.Username,
+		Mailaddress: updatedUser.Mailaddress,
+		CreatedAt:   updatedUser.CreatedAt,
+		UpdatedAt:   updatedUser.UpdatedAt,
+	}, nil
 }
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
+	session, err := r.sessionRepository.GetByToken(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	err = r.userRepository.Delete(ctx, session.UserID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, content string) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: CreatePost - createPost"))
+	session, err := r.sessionRepository.GetByToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	post := domain.Post{
+		UserID:  session.UserID,
+		Content: content,
+	}
+
+	newPost, err := r.postRepository.Create(ctx, &post)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Post{
+		ID:        newPost.ID,
+		Content:   newPost.Content,
+		CreatedAt: newPost.CreatedAt,
+		UpdatedAt: newPost.UpdatedAt,
+		UserID:    newPost.UserID,
+	}, nil
 }
 
 // UpdatePost is the resolver for the updatePost field.
 func (r *mutationResolver) UpdatePost(ctx context.Context, id int, content string) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: UpdatePost - updatePost"))
+	post, err := r.postRepository.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	post.Content = content
+
+	updatedPost, err := r.postRepository.Update(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Post{
+		ID:        updatedPost.ID,
+		Content:   updatedPost.Content,
+		CreatedAt: updatedPost.CreatedAt,
+		UpdatedAt: updatedPost.UpdatedAt,
+		UserID:    updatedPost.UserID,
+	}, nil
 }
 
 // DeletePost is the resolver for the deletePost field.
 func (r *mutationResolver) DeletePost(ctx context.Context, id int) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeletePost - deletePost"))
+	err := r.postRepository.Delete(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // CreateComment is the resolver for the createComment field.
 func (r *mutationResolver) CreateComment(ctx context.Context, postID int, content string) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: CreateComment - createComment"))
+	session, err := r.sessionRepository.GetByToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	comment := domain.Comment{
+		UserID:  session.UserID,
+		PostID:  postID,
+		Content: content,
+	}
+
+	newComment, err := r.commentRepository.Create(ctx, &comment)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Comment{
+		ID:        newComment.ID,
+		Content:   newComment.Content,
+		CreatedAt: newComment.CreatedAt,
+		UpdatedAt: newComment.UpdatedAt,
+		UserID:    newComment.UserID,
+		PostID:    newComment.PostID,
+	}, nil
 }
 
 // CreateLike is the resolver for the createLike field.
 func (r *mutationResolver) CreateLike(ctx context.Context, postID int) (*model.Like, error) {
-	panic(fmt.Errorf("not implemented: CreateLike - createLike"))
+	session, err := r.sessionRepository.GetByToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	like := domain.Like{
+		UserID: session.UserID,
+		PostID: postID,
+	}
+
+	newLike, err := r.likeRepository.Create(ctx, &like)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Like{
+		ID:        newLike.ID,
+		CreatedAt: newLike.CreatedAt,
+		PostID:    newLike.PostID,
+		UserID:    newLike.UserID,
+	}, nil
 }
 
 // DeleteLike is the resolver for the deleteLike field.
-func (r *mutationResolver) DeleteLike(ctx context.Context, postID int) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteLike - deleteLike"))
+func (r *mutationResolver) DeleteLike(ctx context.Context, id int) (bool, error) {
+	if err := r.likeRepository.Delete(ctx, id); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // User is the resolver for the user field.

@@ -74,7 +74,7 @@ type ComplexityRoot struct {
 		CreateLike    func(childComplexity int, postID int) int
 		CreatePost    func(childComplexity int, content string) int
 		CreateUser    func(childComplexity int, userInput schema.UserInput) int
-		DeleteLike    func(childComplexity int, postID int) int
+		DeleteLike    func(childComplexity int, id int) int
 		DeletePost    func(childComplexity int, id int) int
 		DeleteUser    func(childComplexity int) int
 		UpdatePost    func(childComplexity int, id int, content string) int
@@ -126,7 +126,7 @@ type MutationResolver interface {
 	DeletePost(ctx context.Context, id int) (bool, error)
 	CreateComment(ctx context.Context, postID int, content string) (*model.Comment, error)
 	CreateLike(ctx context.Context, postID int) (*model.Like, error)
-	DeleteLike(ctx context.Context, postID int) (bool, error)
+	DeleteLike(ctx context.Context, id int) (bool, error)
 }
 type PostResolver interface {
 	User(ctx context.Context, obj *model.Post) (*model.User, error)
@@ -291,7 +291,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.DeleteLike(childComplexity, args["postID"].(int)), true
+		return e.complexity.Mutation.DeleteLike(childComplexity, args["id"].(int)), true
 
 	case "Mutation.deletePost":
 		if e.complexity.Mutation.DeletePost == nil {
@@ -638,7 +638,7 @@ type Mutation {
     createComment(postID: ID!, content: String!): Comment! @isAuthenticated
 
     createLike(postID: ID!): Like! @isAuthenticated
-    deleteLike(postID: ID!): Boolean! @isAuthenticated
+    deleteLike(id: ID!): Boolean! @isAuthenticated
 }
 `, BuiltIn: false},
 }
@@ -721,14 +721,14 @@ func (ec *executionContext) field_Mutation_deleteLike_args(ctx context.Context, 
 	var err error
 	args := map[string]interface{}{}
 	var arg0 int
-	if tmp, ok := rawArgs["postID"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("postID"))
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
 		arg0, err = ec.unmarshalNID2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["postID"] = arg0
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -2038,7 +2038,7 @@ func (ec *executionContext) _Mutation_deleteLike(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().DeleteLike(rctx, fc.Args["postID"].(int))
+			return ec.resolvers.Mutation().DeleteLike(rctx, fc.Args["id"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.IsAuthenticated == nil {
