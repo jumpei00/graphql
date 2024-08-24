@@ -7,7 +7,7 @@ import (
 )
 
 type SessionRepository interface {
-	GetByToken(ctx context.Context) (domain.Session, error)
+	GetByToken(ctx context.Context) (*domain.Session, error)
 	Create(ctx context.Context, session *domain.Session) (token string, err error)
 	Delete(ctx context.Context) error
 }

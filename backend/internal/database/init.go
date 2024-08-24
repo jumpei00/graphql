@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 
+	"github.com/jumpei00/graphql/backend/internal/domain"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -25,4 +26,12 @@ func NewPostgreSQL() (*PostgreSQLHandler, error) {
 	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
 
 	return &PostgreSQLHandler{db: db}, nil
+}
+
+type SessionHandler struct {
+	db map[string]*domain.Session
+}
+
+func NewSessionHandler() *SessionHandler {
+	return &SessionHandler{db: make(map[string]*domain.Session)}
 }
