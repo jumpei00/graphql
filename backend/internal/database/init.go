@@ -2,6 +2,8 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 
 	"github.com/jumpei00/graphql/backend/internal/domain"
 	"github.com/uptrace/bun"
@@ -15,7 +17,12 @@ type PostgreSQLHandler struct {
 }
 
 func NewPostgreSQL() (*PostgreSQLHandler, error) {
-	dns := "postgres://developer:password@localhost:5432/sns?sslmode=disable"
+	dns := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable", 
+		os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"),
+	)
 
 	pgDB := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dns)))
 	if err := pgDB.Ping(); err != nil {
