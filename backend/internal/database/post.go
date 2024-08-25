@@ -41,17 +41,10 @@ func (p *postRepository) GetAllByUserID(ctx context.Context, userID int) ([]doma
 }
 
 func (p *postRepository) Create(ctx context.Context, post *domain.Post) (*domain.Post, error) {
-	res, err := p.handler.db.NewInsert().Model(post).Exec(ctx)
+	_, err := p.handler.db.NewInsert().Model(post).Exec(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-
-	post.ID = int(id)
 
 	return post, nil
 }

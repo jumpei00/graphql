@@ -34,7 +34,7 @@ func main() {
 			IsAuthenticated: resolver.NewAuthenticator(sessionRepository),
 		},
 	}))
-	srv.Use(extension.FixedComplexityLimit(5))
+	srv.Use(extension.FixedComplexityLimit(10))
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", middleware.AuthenticationMiddleware(srv))

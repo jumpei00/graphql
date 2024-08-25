@@ -33,17 +33,10 @@ func (u *userRepository) Create(ctx context.Context, user *domain.User) (*domain
 
 	user.Password = string(bytes)
 
-	res, err := u.handler.db.NewInsert().Model(user).Exec(ctx)
+	_, err = u.handler.db.NewInsert().Model(user).Exec(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-
-	user.ID = int(id)
 
 	return user, nil
 }

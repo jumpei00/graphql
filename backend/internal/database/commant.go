@@ -33,17 +33,10 @@ func (c *commentRepository) GetAllByUserID(ctx context.Context, userID int) ([]d
 }
 
 func (c *commentRepository) Create(ctx context.Context, comment *domain.Comment) (*domain.Comment, error) {
-	res, err := c.handler.db.NewInsert().Model(comment).Exec(ctx)
+	_, err := c.handler.db.NewInsert().Model(comment).Exec(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-
-	comment.ID = int(id)
 
 	return comment, nil
 }

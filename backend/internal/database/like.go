@@ -33,17 +33,10 @@ func (l *likeRepository) GetAllByUserID(ctx context.Context, userID int) ([]doma
 }
 
 func (l *likeRepository) Create(ctx context.Context, like *domain.Like) (*domain.Like, error) {
-	res, err := l.handler.db.NewInsert().Model(like).Exec(ctx)
+	_, err := l.handler.db.NewInsert().Model(like).Exec(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-
-	like.ID = int(id)
 
 	return like, nil
 }
