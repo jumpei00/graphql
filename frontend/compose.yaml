@@ -1,0 +1,13 @@
+services:
+    frontend:
+        container_name: frontend
+        build:
+            context: .
+            dockerfile: ./Docker/client/Dockerfile
+        ports:
+            - "5173:5173"
+        volumes:
+            - type: bind
+              source: ./
+              target: /frontend
+            - /frontend/node_modules
