@@ -3,7 +3,7 @@ import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
 import App from "./App.tsx";
 
 const client = new ApolloClient({
-    uri: "http://localhost:8080",
+    uri: "http://localhost:8080/query",
     cache: new InMemoryCache(),
 });
 

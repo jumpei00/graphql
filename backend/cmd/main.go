@@ -11,6 +11,7 @@ import (
 	"github.com/jumpei00/graphql/backend/internal/graph"
 	"github.com/jumpei00/graphql/backend/internal/graph/middleware"
 	"github.com/jumpei00/graphql/backend/internal/graph/resolver"
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -36,8 +37,12 @@ func main() {
 	}))
 	srv.Use(extension.FixedComplexityLimit(10))
 
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins: []string{"http://localhost:5173"},
+	}).Handler
+
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", middleware.AuthenticationMiddleware(srv))
+	http.Handle("/query", corsHandler(middleware.AuthenticationMiddleware(srv)))
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", "8080")
 	log.Fatal(http.ListenAndServe(":"+"8080", nil))
