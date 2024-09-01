@@ -6,7 +6,7 @@ export const Route = createFileRoute("/")({
     component: Posts,
 });
 
-export default function Posts() {
+function Posts() {
     const getPosts = graphql(`
         query getPosts {
             posts {

@@ -1,20 +1,23 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
-import Posts from ".";
+import style from "./style.module.css";
 
 export const Route = createRootRoute({
     component: () => (
-        <div>
-            <nav className="bg-gray-800 p-4">
-                <ul className="flex space-x-4">
-                    <li>
-                        <Link to="/" className="text-white hover:text-gray-300">
-                            ホーム
-                        </Link>
-                    </li>
-                </ul>
-            </nav>
+        <>
+			<header className={style.header}>
+				<h2>SNS</h2>
+                <nav>
+                    <ul>
+                        <li>
+                            <Link to="/">ホーム</Link>
+						</li>
+						<li>
+							<Link to="/user/new">新規ユーザー</Link>
+						</li>
+                    </ul>
+                </nav>
+            </header>
             <Outlet />
-            <Posts />
-        </div>
+        </>
     ),
 });
