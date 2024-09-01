@@ -35,7 +35,7 @@ func main() {
 			IsAuthenticated: resolver.NewAuthenticator(sessionRepository),
 		},
 	}))
-	srv.Use(extension.FixedComplexityLimit(10))
+	srv.Use(extension.FixedComplexityLimit(16))
 
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://localhost:5173"},
