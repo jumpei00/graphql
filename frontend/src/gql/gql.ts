@@ -13,8 +13,8 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Therefore it is highly recommended to use the babel or swc plugin for production.
  */
 const documents = {
-    "\n    query getUsers {\n        user {\n            id\n            username\n            mailaddress\n            createdAt\n            updatedAt\n        }\n    }\n": types.GetUsersDocument,
     "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    ": types.GetPostsDocument,
+    "\n        mutation createUser($userInput: UserInput!) {\n            createUser(userInput: $userInput) {\n                id\n                mailaddress\n                username\n            }\n        }\n    ": types.CreateUserDocument,
 };
 
 /**
@@ -34,11 +34,11 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n    query getUsers {\n        user {\n            id\n            username\n            mailaddress\n            createdAt\n            updatedAt\n        }\n    }\n"): (typeof documents)["\n    query getUsers {\n        user {\n            id\n            username\n            mailaddress\n            createdAt\n            updatedAt\n        }\n    }\n"];
+export function graphql(source: "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "): (typeof documents)["\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "): (typeof documents)["\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "];
+export function graphql(source: "\n        mutation createUser($userInput: UserInput!) {\n            createUser(userInput: $userInput) {\n                id\n                mailaddress\n                username\n            }\n        }\n    "): (typeof documents)["\n        mutation createUser($userInput: UserInput!) {\n            createUser(userInput: $userInput) {\n                id\n                mailaddress\n                username\n            }\n        }\n    "];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};
