@@ -1,11 +1,22 @@
 import { createRoot } from "react-dom/client";
-import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
+import {
+    ApolloClient,
+    InMemoryCache,
+    ApolloProvider,
+    createHttpLink,
+} from "@apollo/client";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+
+const link = createHttpLink({
+    uri: "http://localhost:8080/query",
+    credentials: "include",
+});
 
 const client = new ApolloClient({
     uri: "http://localhost:8080/query",
     cache: new InMemoryCache(),
+    link: link,
 });
 
 const router = createRouter({ routeTree: routeTree });

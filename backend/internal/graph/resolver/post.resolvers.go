@@ -109,7 +109,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, userInput schema.User
 			Value:    token,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   false,
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   3600 * 24 * 7,
 		})
@@ -349,7 +349,12 @@ func (r *postResolver) Likes(ctx context.Context, obj *model.Post) ([]*model.Lik
 
 // User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context) (*model.User, error) {
-	user, err := r.userRepository.GetByID(ctx, 1)
+	session, err := r.sessionRepository.GetByToken(ctx, ctx.Value(middleware.SessionKey).(string))
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := r.userRepository.GetByID(ctx, session.UserID)
 	if err != nil {
 		return nil, err
 	}

@@ -38,7 +38,11 @@ func main() {
 	srv.Use(extension.FixedComplexityLimit(16))
 
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:5173"},
+		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowCredentials: true,
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
 	}).Handler
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
