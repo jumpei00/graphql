@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base32"
-	"errors"
+	"encoding/json"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/jumpei00/graphql/backend/internal/domain"
 )
@@ -22,11 +23,22 @@ func NewSessionRepository(handler *SessionHandler) *sessionRepository {
 }
 
 func (s *sessionRepository) GetByToken(ctx context.Context, token string) (*domain.Session, error) {
-	session, ok := s.handler.db[token]
-	if !ok {
-		return nil, errors.New("session not found")
+	cmd := s.handler.db.Get(ctx, token)
+	if cmd.Err() != nil {
+		return nil, cmd.Err()
 	}
-	return session, nil
+
+	j, err := cmd.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	var session domain.Session
+	if err := json.Unmarshal(j, &session); err != nil {
+		return nil, err
+	}
+
+	return &session, nil
 }
 
 func (s *sessionRepository) Create(ctx context.Context, session *domain.Session) (string, error) {
@@ -36,12 +48,18 @@ func (s *sessionRepository) Create(ctx context.Context, session *domain.Session)
 	}
 	token := strings.TrimRight(base32.StdEncoding.EncodeToString(b), "=")
 
-	s.handler.db[token] = session
+	j, err := json.Marshal(session)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.handler.db.Set(ctx, token, j, 3600*24*7*time.Second).Err(); err != nil {
+		return "", err
+	}
 
 	return token, nil
 }
 
 func (s *sessionRepository) Delete(ctx context.Context, token string) error {
-	delete(s.handler.db, token)
-	return nil
+	return s.handler.db.Del(ctx, token).Err()
 }

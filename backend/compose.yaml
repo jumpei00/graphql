@@ -16,6 +16,8 @@ services:
             - DB_PASSWORD=password
             - DB_NAME=sns
             - DB_PORT=5432
+            - REDIS_HOST=redis
+            - REDIS_PORT=6379
         depends_on:
             - postgres
     postgres:
@@ -31,6 +33,16 @@ services:
             POSTGRES_USER: developer
             POSTGRES_PASSWORD: password
             POSTGRES_DB: sns
+    redis:
+        container_name: redis
+        image: redis:7.0
+        ports:
+          - "6379:6379"
+        volumes:
+          - type: volume
+            source: redis-volume
+            target: /data
 
 volumes:
     postgres-volume:
+    redis-volume:

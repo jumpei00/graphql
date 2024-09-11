@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jumpei00/graphql/backend/internal/domain"
+	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -18,7 +18,7 @@ type PostgreSQLHandler struct {
 
 func NewPostgreSQL() (*PostgreSQLHandler, error) {
 	dns := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable", 
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
 		os.Getenv("DB_NAME"),
@@ -36,9 +36,13 @@ func NewPostgreSQL() (*PostgreSQLHandler, error) {
 }
 
 type SessionHandler struct {
-	db map[string]*domain.Session
+	db *redis.Client
 }
 
 func NewSessionHandler() *SessionHandler {
-	return &SessionHandler{db: make(map[string]*domain.Session)}
+	return &SessionHandler{
+		db: redis.NewClient(&redis.Options{
+			Addr: fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT")),
+		}),
+	}
 }
