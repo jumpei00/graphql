@@ -15,6 +15,7 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
 const documents = {
     "\n        query getUser {\n            user {\n                id\n                username\n                mailaddress\n            }\n        }\n    ": types.GetUserDocument,
     "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    ": types.GetPostsDocument,
+    "\n        mutation createPost($content: String!) {\n            createPost(content: $content) {\n                id\n                content\n            }\n        }\n    ": types.CreatePostDocument,
     "\n        mutation createUser($userInput: UserInput!) {\n            createUser(userInput: $userInput) {\n                id\n                mailaddress\n                username\n            }\n        }\n    ": types.CreateUserDocument,
 };
 
@@ -40,6 +41,10 @@ export function graphql(source: "\n        query getUser {\n            user {\n
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "): (typeof documents)["\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n        mutation createPost($content: String!) {\n            createPost(content: $content) {\n                id\n                content\n            }\n        }\n    "): (typeof documents)["\n        mutation createPost($content: String!) {\n            createPost(content: $content) {\n                id\n                content\n            }\n        }\n    "];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
