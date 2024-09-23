@@ -1,44 +1,44 @@
 import { useMutation } from "@apollo/client";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { graphql } from "../../gql";
+import { CREATE_POST, GET_POSTS } from "../../api/post";
 
 export const Route = createFileRoute("/posts/new")({
 	component: PostNew,
 });
 
 function PostNew() {
+	const navigate = useNavigate({ from: "/posts/new" });
 	const [content, setContent] = useState("");
-
-	const createPost = graphql(`
-        mutation createPost($content: String!) {
-            createPost(content: $content) {
-                id
-                content
-            }
-        }
-    `);
-
-	const [createPostMutaion, { loading, error }] = useMutation(createPost);
+	const [createPostMutaion, { loading, error }] = useMutation(CREATE_POST, {
+		refetchQueries: [GET_POSTS],
+	});
 
 	if (loading) return <p>Submitting...</p>;
-	if (error) return <p>Error: {error.message}</p>;
 
 	return (
-		<form
-			onSubmit={(e) => {
-				e.preventDefault();
-				createPostMutaion({ variables: { content: content } });
-			}}
-		>
-			<div>内容</div>
-			<div>
-				<textarea
-					value={content}
-					onChange={(e) => setContent(e.target.value)}
-				/>
-			</div>
-			<button type="submit">Submit</button>
-		</form>
+		<>
+			<form
+				onSubmit={async (e) => {
+					e.preventDefault();
+					const res = await createPostMutaion({
+						variables: { content: content },
+					});
+					if (!res.errors) {
+						navigate({ to: "/", replace: true });
+					}
+				}}
+			>
+				<div>内容</div>
+				<div>
+					<textarea
+						value={content}
+						onChange={(e) => setContent(e.target.value)}
+					/>
+				</div>
+				<button type="submit">Submit</button>
+			</form>
+			{error && <p>Error: {error.message}</p>}
+		</>
 	);
 }

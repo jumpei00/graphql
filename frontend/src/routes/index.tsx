@@ -1,35 +1,14 @@
 import { useQuery } from "@apollo/client";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { graphql } from "../gql";
+import { GET_POSTS } from "../api/post";
 
 export const Route = createFileRoute("/")({
 	component: Posts,
 });
 
 function Posts() {
-	const getPosts = graphql(`
-        query getPosts {
-            posts {
-                id
-                content
-                createdAt
-                updatedAt
-                user {
-                    id
-                    username
-                }
-                comments {
-                    id
-                }
-                likes {
-                    id
-                }
-            }
-        }
-    `);
-
-	const { loading, error, data } = useQuery(getPosts);
+	const { loading, error, data } = useQuery(GET_POSTS);
 	if (loading) return <p>Loading...</p>;
 	if (error) return <p>Error</p>;
 	return (

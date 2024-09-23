@@ -2,7 +2,8 @@ import { useMutation, useSuspenseQuery } from "@apollo/client";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { Suspense, useState } from "react";
-import { graphql } from "../../gql";
+import { CREATE_COMMENT } from "../../api/comment";
+import { GET_POST } from "../../api/post";
 
 export const Route = createFileRoute("/posts/$postId")({
 	component: () => {
@@ -17,43 +18,6 @@ export const Route = createFileRoute("/posts/$postId")({
 		);
 	},
 });
-
-const GET_POST = graphql(`
-	query getPost($postId: ID!) {
-		post(id: $postId) {
-			id
-			content
-			createdAt
-			updatedAt
-			user {
-				id
-				username
-			}
-			comments {
-				id
-				content
-				createdAt
-				updatedAt
-				user {
-					id
-					username
-				}
-			}
-			likes {
-				id
-			}
-		}
-	}
-`);
-
-const CREATE_COMMENT = graphql(`
-	mutation createComment($postId: ID!, $content: String!) {
-		createComment(postID: $postId, content: $content) {
-			id
-			content
-		}
-	}
-`);
 
 function PostShow() {
 	const { postId } = Route.useParams();
@@ -146,7 +110,7 @@ function CommentForm() {
 				</div>
 				<button type="submit">コメントする</button>
 			</form>
-			{error && <p >Error: {error.message}</p>}
+			{error && <p>Error: {error.message}</p>}
 		</>
 	);
 }

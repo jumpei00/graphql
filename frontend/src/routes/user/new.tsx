@@ -1,39 +1,38 @@
 import { useMutation } from "@apollo/client";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { graphql } from "../../gql";
+import { GET_POSTS } from "../../api/post";
+import { CREATE_USER } from "../../api/user";
 
 export const Route = createFileRoute("/user/new")({
 	component: UserNew,
 });
 
 function UserNew() {
+	const navigate = useNavigate({ from: "/user/new" });
 	const [formData, setFormData] = useState({
 		mailaddress: "",
 		username: "",
 		password: "",
 	});
 
-	const createUser = graphql(`
-        mutation createUser($userInput: UserInput!) {
-            createUser(userInput: $userInput) {
-                id
-                mailaddress
-                username
-            }
-        }
-    `);
-
-	const [createUserMutaion, { loading, error }] = useMutation(createUser);
+	const [createUserMutaion, { loading, error }] = useMutation(CREATE_USER, {
+		refetchQueries: [GET_POSTS],
+	});
 
 	if (loading) return <p>Submitting...</p>;
 	if (error) return <p>Error: {error.message}</p>;
 
 	return (
 		<form
-			onSubmit={(e) => {
+			onSubmit={async (e) => {
 				e.preventDefault();
-				createUserMutaion({ variables: { userInput: formData } });
+				const res = await createUserMutaion({
+					variables: { userInput: formData },
+				});
+				if (!res.errors) {
+					navigate({ to: "/", replace: true });
+				}
 			}}
 		>
 			<div>
