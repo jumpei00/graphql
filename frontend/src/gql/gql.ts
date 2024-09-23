@@ -15,6 +15,8 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
 const documents = {
     "\n        query getUser {\n            user {\n                id\n                username\n                mailaddress\n            }\n        }\n    ": types.GetUserDocument,
     "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    ": types.GetPostsDocument,
+    "\n\tquery getPost($postId: ID!) {\n\t\tpost(id: $postId) {\n\t\t\tid\n\t\t\tcontent\n\t\t\tcreatedAt\n\t\t\tupdatedAt\n\t\t\tuser {\n\t\t\t\tid\n\t\t\t\tusername\n\t\t\t}\n\t\t\tcomments {\n\t\t\t\tid\n\t\t\t\tcontent\n\t\t\t\tcreatedAt\n\t\t\t\tupdatedAt\n\t\t\t\tuser {\n\t\t\t\t\tid\n\t\t\t\t\tusername\n\t\t\t\t}\n\t\t\t}\n\t\t\tlikes {\n\t\t\t\tid\n\t\t\t}\n\t\t}\n\t}\n": types.GetPostDocument,
+    "\n\tmutation createComment($postId: ID!, $content: String!) {\n\t\tcreateComment(postID: $postId, content: $content) {\n\t\t\tid\n\t\t\tcontent\n\t\t}\n\t}\n": types.CreateCommentDocument,
     "\n        mutation createPost($content: String!) {\n            createPost(content: $content) {\n                id\n                content\n            }\n        }\n    ": types.CreatePostDocument,
     "\n        mutation createUser($userInput: UserInput!) {\n            createUser(userInput: $userInput) {\n                id\n                mailaddress\n                username\n            }\n        }\n    ": types.CreateUserDocument,
 };
@@ -41,6 +43,14 @@ export function graphql(source: "\n        query getUser {\n            user {\n
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "): (typeof documents)["\n        query getPosts {\n            posts {\n                id\n                content\n                createdAt\n                updatedAt\n                user {\n                    id\n                    username\n                }\n                comments {\n                    id\n                }\n                likes {\n                    id\n                }\n            }\n        }\n    "];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n\tquery getPost($postId: ID!) {\n\t\tpost(id: $postId) {\n\t\t\tid\n\t\t\tcontent\n\t\t\tcreatedAt\n\t\t\tupdatedAt\n\t\t\tuser {\n\t\t\t\tid\n\t\t\t\tusername\n\t\t\t}\n\t\t\tcomments {\n\t\t\t\tid\n\t\t\t\tcontent\n\t\t\t\tcreatedAt\n\t\t\t\tupdatedAt\n\t\t\t\tuser {\n\t\t\t\t\tid\n\t\t\t\t\tusername\n\t\t\t\t}\n\t\t\t}\n\t\t\tlikes {\n\t\t\t\tid\n\t\t\t}\n\t\t}\n\t}\n"): (typeof documents)["\n\tquery getPost($postId: ID!) {\n\t\tpost(id: $postId) {\n\t\t\tid\n\t\t\tcontent\n\t\t\tcreatedAt\n\t\t\tupdatedAt\n\t\t\tuser {\n\t\t\t\tid\n\t\t\t\tusername\n\t\t\t}\n\t\t\tcomments {\n\t\t\t\tid\n\t\t\t\tcontent\n\t\t\t\tcreatedAt\n\t\t\t\tupdatedAt\n\t\t\t\tuser {\n\t\t\t\t\tid\n\t\t\t\t\tusername\n\t\t\t\t}\n\t\t\t}\n\t\t\tlikes {\n\t\t\t\tid\n\t\t\t}\n\t\t}\n\t}\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n\tmutation createComment($postId: ID!, $content: String!) {\n\t\tcreateComment(postID: $postId, content: $content) {\n\t\t\tid\n\t\t\tcontent\n\t\t}\n\t}\n"): (typeof documents)["\n\tmutation createComment($postId: ID!, $content: String!) {\n\t\tcreateComment(postID: $postId, content: $content) {\n\t\t\tid\n\t\t\tcontent\n\t\t}\n\t}\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

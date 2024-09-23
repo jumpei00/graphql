@@ -31,7 +31,7 @@ function PostNew() {
 				createPostMutaion({ variables: { content: content } });
 			}}
 		>
-			<div>content</div>
+			<div>内容</div>
 			<div>
 				<textarea
 					value={content}
