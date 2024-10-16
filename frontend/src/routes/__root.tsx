@@ -1,8 +1,8 @@
 import { useQuery } from "@apollo/client";
 import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
 import { createContext } from "react";
-import { graphql } from "../gql";
 import style from "./style.module.css";
+import { GET_USER } from "../api/user";
 
 export const Route = createRootRoute({
 	component: Root,
@@ -17,17 +17,7 @@ interface User {
 export const UserContext = createContext<User | null>(null);
 
 function Root() {
-	const getUser = graphql(`
-        query getUser {
-            user {
-                id
-                username
-                mailaddress
-            }
-        }
-    `);
-
-	const { loading, error, data } = useQuery(getUser);
+	const { loading, error, data } = useQuery(GET_USER);
 
 	return (
 		<>
