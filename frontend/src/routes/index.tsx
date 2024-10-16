@@ -1,19 +1,22 @@
 import { useQuery } from "@apollo/client";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
+import { useContext } from "react";
 import { GET_POSTS } from "../api/post";
+import { UserContext } from "./__root";
 
 export const Route = createFileRoute("/")({
 	component: Posts,
 });
 
 function Posts() {
+	const user = useContext(UserContext);
 	const { loading, error, data } = useQuery(GET_POSTS);
 	if (loading) return <p>Loading...</p>;
 	if (error) return <p>Error</p>;
 	return (
 		<>
-			<Link to="/posts/new">新規投稿</Link>
+			{user && <Link to="/posts/new">新規投稿</Link>}
 			<div style={{ marginTop: "16px" }}>
 				{data?.posts.map((post) => (
 					<div key={post.id}>
