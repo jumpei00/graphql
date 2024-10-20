@@ -31,7 +31,7 @@ func newCommentLoader(postRepository repository.PostRepository) *dataloader.Load
 	loader := commentLoader{
 		postRepository: postRepository,
 	}
-	return dataloader.NewBatchedLoader(loader.batchFunc(), dataloader.WithCache(&dataloader.NoCache[int, []*model.Comment]{}))
+	return dataloader.NewBatchedLoader(loader.batchFunc(), dataloader.WithClearCacheOnBatch[int, []*model.Comment]())
 }
 
 func (c *commentLoader) batchFunc() dataloader.BatchFunc[int, []*model.Comment] {
@@ -77,7 +77,7 @@ func newLikeLoader(postRepository repository.PostRepository) *dataloader.Loader[
 	loader := likeLoader{
 		postRepository: postRepository,
 	}
-	return dataloader.NewBatchedLoader(loader.batchFunc(), dataloader.WithCache(&dataloader.NoCache[int, []*model.Like]{}))
+	return dataloader.NewBatchedLoader(loader.batchFunc(), dataloader.WithClearCacheOnBatch[int, []*model.Like]())
 }
 
 func (l *likeLoader) batchFunc() dataloader.BatchFunc[int, []*model.Like] {
