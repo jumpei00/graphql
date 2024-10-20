@@ -17,3 +17,11 @@ type Post struct {
 	Comments      []*Comment `bun:"rel:has-many,join:id=post_id"`
 	Likes         []*Like    `bun:"rel:has-many,join:id=post_id"`
 }
+
+func WithComments(s *bun.SelectQuery) *bun.SelectQuery {
+	return s.Relation("Comments")
+}
+
+func WithLikes(s *bun.SelectQuery) *bun.SelectQuery {
+	return s.Relation("Likes")
+}

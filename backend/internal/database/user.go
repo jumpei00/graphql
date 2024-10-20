@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jumpei00/graphql/backend/internal/domain"
+	"github.com/uptrace/bun"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +24,14 @@ func (u *userRepository) GetByID(ctx context.Context, id int) (*domain.User, err
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (u *userRepository) GetAllByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	var users []*domain.User
+	if err := u.handler.db.NewSelect().Model(&users).Where("id IN (?)", bun.In(ids)).Scan(ctx); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (u *userRepository) Create(ctx context.Context, user *domain.User) (*domain.User, error) {

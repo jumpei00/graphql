@@ -291,7 +291,9 @@ func (r *mutationResolver) DeleteLike(ctx context.Context, id int) (bool, error)
 
 // User is the resolver for the user field.
 func (r *postResolver) User(ctx context.Context, obj *model.Post) (*model.User, error) {
-	user, err := r.userRepository.GetByID(ctx, obj.UserID)
+	thunk := r.loaders.UserLoader.Load(ctx, obj.UserID)
+
+	user, err := thunk()
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +309,9 @@ func (r *postResolver) User(ctx context.Context, obj *model.Post) (*model.User, 
 
 // Comments is the resolver for the comments field.
 func (r *postResolver) Comments(ctx context.Context, obj *model.Post) ([]*model.Comment, error) {
-	comments, err := r.commentRepository.GetAllByPostID(ctx, obj.ID)
+	thunk := r.loaders.CommentLoader.Load(ctx, obj.ID)
+
+	comments, err := thunk()
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +333,9 @@ func (r *postResolver) Comments(ctx context.Context, obj *model.Post) ([]*model.
 
 // Likes is the resolver for the likes field.
 func (r *postResolver) Likes(ctx context.Context, obj *model.Post) ([]*model.Like, error) {
-	likes, err := r.likeRepository.GetAllByPostID(ctx, obj.ID)
+	thunk := r.loaders.LikeLoader.Load(ctx, obj.ID)
+
+	likes, err := thunk()
 	if err != nil {
 		return nil, err
 	}

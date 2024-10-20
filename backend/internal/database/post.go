@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jumpei00/graphql/backend/internal/domain"
+	"github.com/uptrace/bun"
 )
 
 type postRepository struct {
@@ -26,9 +27,24 @@ func (p *postRepository) GetByID(ctx context.Context, id int) (*domain.Post, err
 
 func (p *postRepository) GetAll(ctx context.Context) ([]domain.Post, error) {
 	var posts []domain.Post
-	if err := p.handler.db.NewSelect().Model(&posts).Scan(ctx); err != nil {
+	if err := p.handler.db.NewSelect().Model(&posts).Order("updated_at DESC").Scan(ctx); err != nil {
 		return nil, err
 	}
+	return posts, nil
+}
+
+func (p *postRepository) GetAllByIDs(ctx context.Context, ids []int, relations ...func(*bun.SelectQuery) *bun.SelectQuery) ([]domain.Post, error) {
+	var posts []domain.Post
+
+	query := p.handler.db.NewSelect().Model(&posts).Where("id IN (?)", bun.In(ids)).Order("updated_at DESC")
+	for _, relation := range relations {
+		query = relation(query)
+	}
+
+	if err := query.Scan(ctx); err != nil {
+		return nil, err
+	}
+
 	return posts, nil
 }
 

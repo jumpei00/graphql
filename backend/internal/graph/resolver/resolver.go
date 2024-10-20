@@ -12,6 +12,7 @@ type Resolver struct {
 	postRepository    repository.PostRepository
 	commentRepository repository.CommentRepository
 	likeRepository    repository.LikeRepository
+	loaders           *Loaders
 }
 
 func NewResolver(
@@ -27,5 +28,6 @@ func NewResolver(
 		postRepository:    postRepository,
 		commentRepository: commentRepository,
 		likeRepository:    likeRepository,
+		loaders:           NewLoaders(postRepository, userRepository),
 	}
 }
